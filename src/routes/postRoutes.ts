@@ -1,15 +1,16 @@
-import express, {Request, Response} from "express";
+import express, { Request, Response } from "express";
 import Post, { IPost } from "../models/Post";
 import { getAuth } from "@clerk/express";
+import { clerkClient } from "@clerk/clerk-sdk-node";
 
 const router = express.Router();
 
 // Створити новий пост
-router.post("/", async (req: any, res: any) => {   // можна прибрати requireAuth()
+router.post("/", async (req: any, res: any) => {
   console.log("Received body:", req.body);
-  console.log("AUTH object:", req.auth);           // подивись весь об'єкт
+  console.log("AUTH object:", req.auth);
 
-  const { userId } = getAuth(req);                 // ← правильний спосіб
+  const { userId } = getAuth(req);
 
   if (!userId) {
     return res.status(401).json({ message: "Не авторизовано" });
@@ -20,7 +21,7 @@ router.post("/", async (req: any, res: any) => {   // можна прибрат�
   try {
     const post: IPost = new Post({
       ...req.body,
-      authorId: userId
+      authorId: userId,
     });
 
     await post.save();
@@ -29,7 +30,7 @@ router.post("/", async (req: any, res: any) => {   // можна прибрат�
     console.error("Create post error:", err);
     res.status(400).json({
       message: err.message,
-      errors: err.errors
+      errors: err.errors,
     });
   }
 });
@@ -38,7 +39,30 @@ router.post("/", async (req: any, res: any) => {   // можна прибрат�
 router.get("/", async (req: Request, res: Response) => {
   try {
     const posts = await Post.find().sort({ createdAt: -1 });
-    res.json(posts);
+
+    // отримуємо унікальні userId
+    const userIds = [...new Set(posts.map((p) => p.authorId))];
+
+    // отримуємо користувачів з Clerk
+    const users = await clerkClient.users.getUserList({
+      userId: userIds,
+    });
+
+    const userMap: any = {};
+    users.forEach((user) => {
+      userMap[user.id] = user;
+    });
+
+    // додаємо дані автора до постів
+    const postsWithAuthors = posts.map((post) => ({
+      ...post.toObject(),
+      author: {
+        name: userMap[post.authorId]?.firstName || "Unknown",
+        avatar: userMap[post.authorId]?.imageUrl,
+      },
+    }));
+
+    res.json(postsWithAuthors);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
@@ -49,7 +73,16 @@ router.get("/:id", async (req: Request, res: Response) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Пост не знайдено" });
-    res.json(post);
+    const userId = post.authorId;
+    const user = await clerkClient.users.getUser(userId);
+    const fullInfo = {
+      ...post.toObject(),
+      author: {
+        name: user?.firstName || "Unknown",
+        avatar: user?.imageUrl || null
+      }
+    }
+    res.json(fullInfo);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
