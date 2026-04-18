@@ -14,7 +14,6 @@ app.use(clerkMiddleware());
 
 const PORT = process.env.PORT || 5000;
 
-// Підключення до MongoDB
 const MONGO_URI = process.env.MONGO_URI
 
 if (!MONGO_URI) {

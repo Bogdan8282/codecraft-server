@@ -5,7 +5,19 @@ import { clerkClient } from "@clerk/clerk-sdk-node";
 
 const router = express.Router();
 
-// Створити новий пост
+router.get("/dashboard", async (req: any, res: any) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ message: "Не авторизовано" });
+
+  try {
+    const posts = await Post.find({ authorId: userId });
+    res.json(posts);
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    res.status(500).json({ message: "Помилка при отриманні постів" });
+  }
+});
+
 router.post("/", async (req: any, res: any) => {
   console.log("Received body:", req.body);
   console.log("AUTH object:", req.auth);
@@ -35,15 +47,85 @@ router.post("/", async (req: any, res: any) => {
   }
 });
 
-// Отримати всі пости
+router.post("/:id/vote", async (req: any, res: any) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ message: "Не авторизовано" });
+
+  const { type } = req.body; // 'like' або 'dislike'
+  const { id } = req.params;
+
+  try {
+    const post = await Post.findById(id);
+    if (!post) return res.status(404).json({ message: "Пост не знайдено" });
+
+    if (type === 'like') {
+      post.dislikes = post.dislikes.filter(uid => uid !== userId);
+      if (post.likes.includes(userId)) {
+        post.likes = post.likes.filter(uid => uid !== userId);
+      } else {
+        post.likes.push(userId);
+      }
+    } else {
+      post.likes = post.likes.filter(uid => uid !== userId);
+      if (post.dislikes.includes(userId)) {
+        post.dislikes = post.dislikes.filter(uid => uid !== userId);
+      } else {
+        post.dislikes.push(userId);
+      }
+    }
+
+    await post.save();
+    res.json({ likes: post.likes.length, dislikes: post.dislikes.length });
+  } catch (err) {
+    res.status(500).json({ message: "Помилка сервера" });
+  }
+});
+
+router.delete("/:id", async (req: any, res: any) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ message: "Не авторизовано" });
+
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Пост не знайдено" });
+
+    if (post.authorId !== userId) {
+      return res.status(403).json({ message: "Ви не можете видалити чужий пост" });
+    }
+
+    await Post.findByIdAndDelete(req.params.id);
+    res.json({ message: "Пост успішно видалено" });
+  } catch (err) {
+    res.status(500).json({ message: "Помилка сервера" });
+  }
+});
+
+router.get("/:id", async (req: Request, res: Response) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Пост не знайдено" });
+    const userId = post.authorId;
+    const user = await clerkClient.users.getUser(userId);
+    const fullInfo = {
+      ...post.toObject(),
+      author: {
+        name: user?.firstName || "Unknown",
+        avatar: user?.imageUrl || null
+      }
+    }
+    res.json(fullInfo);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.get("/", async (req: Request, res: Response) => {
   try {
     const posts = await Post.find().sort({ createdAt: -1 });
 
-    // отримуємо унікальні userId
+    // унікальні userId
     const userIds = [...new Set(posts.map((p) => p.authorId))];
 
-    // отримуємо користувачів з Clerk
     const users = await clerkClient.users.getUserList({
       userId: userIds,
     });
@@ -67,34 +149,5 @@ router.get("/", async (req: Request, res: Response) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-// Отримати один пост за ID
-router.get("/:id", async (req: Request, res: Response) => {
-  try {
-    const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Пост не знайдено" });
-    const userId = post.authorId;
-    const user = await clerkClient.users.getUser(userId);
-    const fullInfo = {
-      ...post.toObject(),
-      author: {
-        name: user?.firstName || "Unknown",
-        avatar: user?.imageUrl || null
-      }
-    }
-    res.json(fullInfo);
-  } catch (err: any) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// router.get("/api/dashboard", requireAuth(), async (req: Request, res: Response) => {
-
-//   const posts = await Post.find({
-//     authorId: req.auth.userId
-//   });
-
-//   res.json(posts);
-// });
 
 export default router;
