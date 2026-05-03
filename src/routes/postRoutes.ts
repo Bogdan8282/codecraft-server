@@ -84,9 +84,50 @@ router.post("/:id/vote", async (req: any, res: any) => {
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const { search, sort } = req.query;
 
-    const userIds = [...new Set(posts.map((p) => p.authorId))];
+    const filter: any = {};
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search as string, $options: "i" } },
+        { content: { $regex: search as string, $options: "i" } },
+      ];
+    }
+
+    const posts = await Post.find(filter);
+
+    let processedPosts = await Promise.all(
+      posts.map(async (doc) => {
+        const post = doc.toObject();
+
+        const commentsCount = await Comment.countDocuments({
+          postId: post._id,
+        });
+
+        const likesCount = post.likes?.length || 0;
+        const dislikesCount = post.dislikes?.length || 0;
+        const popularity = likesCount - dislikesCount;
+
+        return {
+          ...post,
+          commentsCount,
+          popularity,
+        };
+      }),
+    );
+
+    if (sort === "popular") {
+      processedPosts.sort((a, b) => b.popularity - a.popularity);
+    } else if (sort === "discussed") {
+      processedPosts.sort((a, b) => b.commentsCount - a.commentsCount);
+    } else {
+      processedPosts.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    }
+
+    const userIds = [...new Set(processedPosts.map((p) => p.authorId))];
 
     const users = await clerkClient.users.getUserList({
       userId: userIds,
@@ -96,10 +137,9 @@ router.get("/", async (req: Request, res: Response) => {
     users.forEach((user) => {
       userMap[user.id] = user;
     });
-
-    // додаємо дані автора до постів
-    const postsWithAuthors = posts.map((post) => ({
-      ...post.toObject(),
+    
+    const postsWithAuthors = processedPosts.map((post) => ({
+      ...post,
       author: {
         name: userMap[post.authorId]?.firstName || "Unknown",
         avatar: userMap[post.authorId]?.imageUrl,
