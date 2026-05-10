@@ -20,16 +20,11 @@ router.get("/dashboard", async (req: any, res: any) => {
 });
 
 router.post("/", async (req: any, res: any) => {
-  console.log("Received body:", req.body);
-  console.log("AUTH object:", req.auth);
-
   const { userId } = getAuth(req);
 
   if (!userId) {
     return res.status(401).json({ message: "Не авторизовано" });
   }
-
-  console.log("userId from Clerk:", userId);
 
   try {
     const post: IPost = new Post({

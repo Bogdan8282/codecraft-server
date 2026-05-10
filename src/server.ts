@@ -1,9 +1,12 @@
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import postRoutes from "./routes/postRoutes"
+import postRoutes from "./routes/postRoutes";
 import dotenv from "dotenv";
 import { clerkMiddleware } from "@clerk/express";
+import helmet from "helmet";
+import mongoSanitize from "express-mongo-sanitize";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
 
@@ -12,12 +15,21 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
 app.use(express.json());
 app.use(clerkMiddleware());
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: "Забагато запитів з цієї адреси, спробуйте пізніше.",
+});
+app.use("/api/", limiter);
+app.use(mongoSanitize());
+app.use(helmet());
+
 const PORT = process.env.PORT || 5000;
 
-const MONGO_URI = process.env.MONGO_URI
+const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
-  throw new Error('MONGO_URI не знайдено в змінних середовища');
+  throw new Error("MONGO_URI не знайдено в змінних середовища");
 }
 
 mongoose
