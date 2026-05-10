@@ -27,10 +27,14 @@ router.post("/", async (req: any, res: any) => {
   }
 
   try {
-    const post: IPost = new Post({
-      ...req.body,
-      authorId: userId,
-    });
+    const postData = {...req.body, authorId: userId}
+
+    if (postData.imageURL == "" || postData.imageURL.isNaN()) {
+      const randomSeed = Math.random().toString(36).substring(7);
+      postData.imageURL = `https://api.dicebear.com/9.x/shapes/svg?seed=${randomSeed}`;
+    }
+
+    const post: IPost = new Post(postData);
 
     await post.save();
     res.status(201).json(post);
