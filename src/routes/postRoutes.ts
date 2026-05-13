@@ -29,7 +29,7 @@ router.post("/", async (req: any, res: any) => {
   try {
     const postData = {...req.body, authorId: userId}
 
-    if (postData.imageURL == "" || postData.imageURL.isNaN()) {
+    if (postData.imageURL == "" || postData.imageURL == null) {
       const randomSeed = Math.random().toString(36).substring(7);
       postData.imageURL = `https://api.dicebear.com/9.x/shapes/svg?seed=${randomSeed}`;
     }
@@ -154,7 +154,7 @@ router.get("/", async (req: Request, res: Response) => {
 router.get("/:id/comments", async (req: Request, res: Response) => {
   try {
     const comments = await Comment.find({ postId: req.params.id }).sort({
-      createdAt: -1,
+      createdAt: 1,
     });
 
     if (comments.length === 0) {
