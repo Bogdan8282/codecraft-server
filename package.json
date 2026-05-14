@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/server.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "dev": "npx ts-node src/server.ts",
-    "build": "tsc",
+    "build": "tsc && npm start",
     "start": "node dist/server.ts",
     "watch": "tsc --watch"
   },
