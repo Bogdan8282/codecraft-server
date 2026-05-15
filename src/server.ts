@@ -15,6 +15,8 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
 app.use(express.json());
 app.use(clerkMiddleware());
 
+app.set('trust proxy', 1);
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
