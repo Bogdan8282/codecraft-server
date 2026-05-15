@@ -1,8 +1,8 @@
 import express, { Request, Response } from "express";
-import Post, { IPost } from "../models/Post";
+import Post, { IPost } from "../models/Post.js";
 import { getAuth } from "@clerk/express";
 import { clerkClient } from "@clerk/clerk-sdk-node";
-import Comment from "../models/Comment";
+import Comment from "../models/Comment.js";
 
 const router = express.Router();
 

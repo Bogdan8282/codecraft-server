@@ -1,7 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import postRoutes from "./routes/postRoutes";
+import postRoutes from "./routes/postRoutes.js";
 import dotenv from "dotenv";
 import { clerkMiddleware } from "@clerk/express";
 import helmet from "helmet";
