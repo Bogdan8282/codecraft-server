@@ -143,26 +143,24 @@ router.get("/", async (req: Request, res: Response) => {
       });
     }
 
-    const userIds = [...new Set(paginatedPosts.map((p) => p.authorId))];
+    const userIds = [
+      ...new Set(paginatedPosts.map((p) => p.authorId).filter(Boolean)),
+    ];
 
-    let users: any[] = [];
-    try {
-      const clerkResponse = await clerkClient.users.getUserList({
-        userId: userIds,
-      });
-      if (clerkResponse && typeof clerkResponse === 'object' && 'data' in clerkResponse) {
-        users = (clerkResponse as any).data;
-      } else if (Array.isArray(clerkResponse)) {
-        users = clerkResponse;
+    const userMap: Record<string, any> = {};
+    if (userIds.length > 0) {
+      try {
+        const usersResponse = await clerkClient.users.getUserList({
+          userId: userIds,
+        });
+        const users: any[] = (usersResponse as any).data ?? usersResponse ?? [];
+        users.forEach((user: any) => {
+          userMap[user.id] = user;
+        });
+      } catch (clerkError) {
+        console.error("Clerk error:", clerkError);
       }
-    } catch (clerkError) {
-      console.error("Clerk error:", clerkError);
     }
-
-    const userMap: any = {};
-    users.forEach((user) => {
-      userMap[user.id] = user;
-    });
 
     const postsWithAuthors = paginatedPosts.map((post) => ({
       ...post,
