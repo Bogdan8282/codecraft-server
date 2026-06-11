@@ -27,7 +27,7 @@ router.post("/", async (req: any, res: any) => {
   }
 
   try {
-    const postData = {...req.body, authorId: userId}
+    const postData = { ...req.body, authorId: userId };
 
     if (postData.imageURL == "" || postData.imageURL == null) {
       const randomSeed = Math.random().toString(36).substring(7);
@@ -83,7 +83,10 @@ router.post("/:id/vote", async (req: any, res: any) => {
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { search, sort } = req.query;
+    const { search, sort, page, limit } = req.query;
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 9;
 
     const filter: any = {};
     if (search) {
@@ -126,18 +129,37 @@ router.get("/", async (req: Request, res: Response) => {
       );
     }
 
-    const userIds = [...new Set(processedPosts.map((p) => p.authorId))];
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = pageNum * limitNum;
 
-    const users = await clerkClient.users.getUserList({
-      userId: userIds,
-    });
+    const hasMore = endIndex < processedPosts.length;
+
+    const paginatedPosts = processedPosts.slice(startIndex, endIndex);
+
+    if (paginatedPosts.length === 0) {
+      return res.json({
+        posts: [],
+        hasMore: false,
+      });
+    }
+
+    const userIds = [...new Set(paginatedPosts.map((p) => p.authorId))];
+
+    let users: any[] = [];
+    try {
+      users = await clerkClient.users.getUserList({
+        userId: userIds,
+      });
+    } catch (clerkError) {
+      console.error("Clerk error:", clerkError);
+    }
 
     const userMap: any = {};
     users.forEach((user) => {
       userMap[user.id] = user;
     });
-    
-    const postsWithAuthors = processedPosts.map((post) => ({
+
+    const postsWithAuthors = paginatedPosts.map((post) => ({
       ...post,
       author: {
         name: userMap[post.authorId]?.firstName || "Unknown",
@@ -145,7 +167,10 @@ router.get("/", async (req: Request, res: Response) => {
       },
     }));
 
-    res.json(postsWithAuthors);
+    res.json({
+      posts: postsWithAuthors,
+      hasMore: hasMore,
+    });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
