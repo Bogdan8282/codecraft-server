@@ -147,9 +147,14 @@ router.get("/", async (req: Request, res: Response) => {
 
     let users: any[] = [];
     try {
-      users = await clerkClient.users.getUserList({
+      const clerkResponse = await clerkClient.users.getUserList({
         userId: userIds,
       });
+      if (clerkResponse && typeof clerkResponse === 'object' && 'data' in clerkResponse) {
+        users = (clerkResponse as any).data;
+      } else if (Array.isArray(clerkResponse)) {
+        users = clerkResponse;
+      }
     } catch (clerkError) {
       console.error("Clerk error:", clerkError);
     }
